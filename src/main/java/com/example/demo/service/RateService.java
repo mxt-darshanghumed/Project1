@@ -235,12 +235,13 @@ public class RateService {
      * @param rate the rate to normalize.
      */
     private void normalizeRate(BungalowRate rate) {
-        if (rate.getNights() > 1) {
+        if (rate.getNights() != null && rate.getNights() > 1) {
             double perNightValue = rate.getValue() / rate.getNights();
             rate.setNights(1);
             rate.setValue(perNightValue);
         }
     }
+
 
     /**
      * Creates a shallow clone of a BungalowRate.
