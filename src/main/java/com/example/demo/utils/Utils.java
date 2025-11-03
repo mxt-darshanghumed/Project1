@@ -4,7 +4,6 @@ import com.example.demo.entity.BungalowRate;
 import com.example.demo.repository.RateRepository;
 import com.example.demo.service.RateValidator;
 import org.apache.poi.ss.usermodel.Row;
-
 import java.time.LocalDate;
 import java.util.List;
 
@@ -42,7 +41,8 @@ public class Utils {
     public void prepareNewRate(BungalowRate newRate) {
         normalizeRate(newRate);
 
-        if (newRate.getBookingDateFrom() == null) {
+        if (newRate.getBookingDateFrom() == null)
+        {
             newRate.setBookingDateTo(LocalDate.now());
         }
 
