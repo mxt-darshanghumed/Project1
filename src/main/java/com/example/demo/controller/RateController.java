@@ -42,7 +42,7 @@ public class RateController {
      */
     @PostMapping
     public ResponseEntity<BungalowRate> createRate(@RequestBody BungalowRate newRate) {
-        BungalowRate savedRate = rateService.addRate(newRate);
+        BungalowRate savedRate = rateService.createRate(newRate);
         return ResponseEntity.status(HttpStatus.CREATED).body(savedRate);
     }
 
@@ -53,7 +53,7 @@ public class RateController {
      */
     @GetMapping
     public ResponseEntity<List<BungalowRate>> getAllRates() {
-        return ResponseEntity.ok(rateService.fetchAllRates());
+        return ResponseEntity.ok(rateService.getAllRates());
     }
 
     /**
@@ -64,7 +64,7 @@ public class RateController {
      */
     @GetMapping("/{id}")
     public ResponseEntity<BungalowRate> getRateById(@PathVariable Long id) {
-        BungalowRate rate = rateService.fetchRateById(id);
+        BungalowRate rate = rateService.getRateById(id);
         return ResponseEntity.ok(rate);
     }
 
@@ -76,7 +76,7 @@ public class RateController {
      */
     @GetMapping("/bungalow/{bungalowId}")
     public ResponseEntity<List<BungalowRate>> getRatesByBungalowId(@PathVariable Long bungalowId) {
-        return ResponseEntity.ok(rateService.fetchActiveRatesByBungalow(bungalowId));
+        return ResponseEntity.ok(rateService.getRatesByBungalowId(bungalowId));
     }
 
     /**
@@ -125,7 +125,7 @@ public class RateController {
      */
     @DeleteMapping("/{id}")
     public ResponseEntity<String> deleteRate(@PathVariable Long id) {
-        rateService.removeRate(id);
+        rateService.deleteRate(id);
         return ResponseEntity.ok("Rate with ID " + id + " deleted permanently.");
     }
 
@@ -204,7 +204,7 @@ public class RateController {
             @RequestParam String departure,
             @RequestParam String bookingDate) {
 
-        double total = rateService.calculateStayPrice(
+        double total = rateService.calculatePrice(
                 bungalowId,
                 LocalDate.parse(arrival),
                 LocalDate.parse(departure),
