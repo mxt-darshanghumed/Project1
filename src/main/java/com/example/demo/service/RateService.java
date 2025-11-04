@@ -145,9 +145,13 @@ public class RateService{
                 ratesRepository.findByBungalowIdAndBookingDateToIsNullAndStayDateToGreaterThanEqualAndStayDateFromLessThanEqual(
                         Long.valueOf(newRate.getBungalowId()), newFrom, newTo);
 
-        for (BungalowRate oldRate : overlappingRates) {
+        if(!overlappingRates.isEmpty())
+        { for (BungalowRate oldRate : overlappingRates)
+            {
             util.splitRateIfOverlapping(oldRate, newRate);
+              }
         }
+
     }
 
     /**
