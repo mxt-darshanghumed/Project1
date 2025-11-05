@@ -141,14 +141,8 @@ public class RateController {
      */
     @PostMapping("/import")
     public ResponseEntity<String> importRatesFromExcel(@RequestParam("file") MultipartFile file) {
-        try {
-            rateService.importRatesFromExcel(file);
-            return ResponseEntity.ok("BungalowRate imported successfully with merge/split handling.");
-        } catch (IOException e) {
-            e.printStackTrace();
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body("Error importing Excel file: " + e.getMessage());
-        }
+        rateService.importRatesFromExcel(file);
+        return ResponseEntity.ok("BungalowRate imported successfully with merge/split handling.");
     }
 
     /**
@@ -161,22 +155,17 @@ public class RateController {
      */
     @GetMapping("/export")
     public ResponseEntity<byte[]> exportRatesToExcel() {
-        try {
-            ByteArrayInputStream in = rateService.exportRatesToExcel();
-            byte[] bytes = in.readAllBytes();
+        ByteArrayInputStream in = rateService.exportRatesToExcel();
+        byte[] bytes = in.readAllBytes();
 
-            HttpHeaders headers = new HttpHeaders();
-            headers.set(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=BungalowRate.xlsx");
-            headers.setContentType(MediaType.parseMediaType(
-                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"));
+        HttpHeaders headers = new HttpHeaders();
+        headers.set(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=BungalowRate.xlsx");
+        headers.setContentType(MediaType.parseMediaType(
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"));
 
-            return ResponseEntity.ok()
-                    .headers(headers)
-                    .body(bytes);
-        } catch (IOException e) {
-            e.printStackTrace();
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(null);
-        }
+        return ResponseEntity.ok()
+                .headers(headers)
+                .body(bytes);
     }
 
     /**

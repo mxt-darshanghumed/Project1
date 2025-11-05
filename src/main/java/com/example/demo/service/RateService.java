@@ -7,6 +7,9 @@ import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 import com.example.demo.entity.BungalowRate;
+import com.example.demo.exception.FileProcessingException;
+import com.example.demo.exception.InvalidRequestException;
+import com.example.demo.exception.ResourceNotFoundException;
 import com.example.demo.repository.RateRepository;
 import com.example.demo.utils.Utils;
 import org.apache.poi.ss.usermodel.Row;
@@ -69,7 +72,7 @@ public class RateService{
      */
     public BungalowRate getRateById(Long id) {
         return ratesRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Rate not found with id " + id));
+                .orElseThrow(() -> new ResourceNotFoundException("Rate not found with id " + id));
     }
 
     /**
@@ -197,11 +200,20 @@ public class RateService{
      * @param dated cutoff date when this rate should no longer be active
      * @throws RuntimeException if the rate does not exist
      */
+//    public void closeRate(Long rateId, LocalDate dated) {
+//        BungalowRate rate = ratesRepository.findById(rateId)
+//                .orElseThrow(() -> new RuntimeException("Rate not found"));
+//
+//        // closing the rate by setting the bookingDateTo as today
+//        rate.setBookingDateTo(dated);
+//        ratesRepository.save(rate);
+//    }
     public void closeRate(Long rateId, LocalDate dated) {
         BungalowRate rate = ratesRepository.findById(rateId)
-                .orElseThrow(() -> new RuntimeException("Rate not found"));
-
-        // closing the rate by setting the bookingDateTo as today
+                .orElseThrow(() -> new ResourceNotFoundException("Rate not found"));
+        if (dated == null) {
+            throw new InvalidRequestException("Closing date cannot be null");
+        }
         rate.setBookingDateTo(dated);
         ratesRepository.save(rate);
     }
@@ -217,9 +229,15 @@ public class RateService{
      * @param rateId unique identifier of the rate to remove
      * @throws RuntimeException if the rate does not exist
      */
+//    public void deleteRate(Long rateId) {
+//        if (!ratesRepository.existsById(rateId)) {
+//            throw new RuntimeException("Rate not found");
+//        }
+//        ratesRepository.deleteById(rateId);
+//    }
     public void deleteRate(Long rateId) {
         if (!ratesRepository.existsById(rateId)) {
-            throw new RuntimeException("Rate not found");
+            throw new ResourceNotFoundException("Rate not found with id " + rateId);
         }
         ratesRepository.deleteById(rateId);
     }
@@ -240,21 +258,31 @@ public class RateService{
      * @return the newly created {@link BungalowRate} entity representing updated pricing
      * @throws RuntimeException if no rate exists for the provided ID
      */
+//    public BungalowRate updateRate(Long id, BungalowRate updatedRate) {
+//        BungalowRate current = ratesRepository.findById(id)
+//                .orElseThrow(() -> new RuntimeException("Rate not found"));
+//
+//        // Step 1: soft close current rate
+//        current.setBookingDateTo(LocalDate.now());
+//        ratesRepository.save(current);
+//
+//        // Step 2: updatedRate becomes new starting rate
+//        updatedRate.setRateId(null); // new record
+//        updatedRate.setBookingDateFrom(LocalDate.now());
+//
+//        // Step 3: re-run all split and merge magic
+//        return createRate(updatedRate);
+//    }
     public BungalowRate updateRate(Long id, BungalowRate updatedRate) {
         BungalowRate current = ratesRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Rate not found"));
-
-        // Step 1: soft close current rate
+                .orElseThrow(() -> new ResourceNotFoundException("Rate not found with id " + id));
         current.setBookingDateTo(LocalDate.now());
         ratesRepository.save(current);
-
-        // Step 2: updatedRate becomes new starting rate
-        updatedRate.setRateId(null); // new record
+        updatedRate.setRateId(null);
         updatedRate.setBookingDateFrom(LocalDate.now());
-
-        // Step 3: re-run all split and merge magic
         return createRate(updatedRate);
     }
+
 
     /**
      * Exports all rate records into an Excel spreadsheet.
@@ -267,38 +295,37 @@ public class RateService{
      * @return a {@link ByteArrayInputStream} representing the Excel file content
      * @throws IOException if an issue occurs during writing of file data
      */
-    public ByteArrayInputStream exportRatesToExcel() throws IOException {
-        List<BungalowRate> BungalowRate = ratesRepository.findAll();
+    public ByteArrayInputStream exportRatesToExcel() {
+        try (Workbook workbook = new XSSFWorkbook()) {
+            List<BungalowRate> BungalowRate = ratesRepository.findAll();
+            Sheet sheet = workbook.createSheet("BungalowRate");
 
-        Workbook workbook = new XSSFWorkbook();
-        Sheet sheet = workbook.createSheet("BungalowRate");
+            Row header = sheet.createRow(0);
+            String[] columns = {"ID", "BungalowID", "StayDateFrom", "StayDateTo", "Nights", "Value", "BookDateFrom", "BookDateTo"};
+            for (int i = 0; i < columns.length; i++) header.createCell(i).setCellValue(columns[i]);
 
-        Row header = sheet.createRow(0);
-        String[] columns = {"ID", "BungalowID", "StayDateFrom", "StayDateTo",
-                "Nights", "Value", "BookDateFrom", "BookDateTo"};
+            int rowIdx = 1;
+            for (BungalowRate r : BungalowRate) {
+                Row row = sheet.createRow(rowIdx++);
+                row.createCell(0).setCellValue(r.getRateId());
+                row.createCell(1).setCellValue(r.getBungalowId());
+                row.createCell(2).setCellValue(r.getStayDateFrom().toString());
+                row.createCell(3).setCellValue(r.getStayDateTo().toString());
+                row.createCell(4).setCellValue(r.getNights());
+                row.createCell(5).setCellValue(r.getValue());
+                row.createCell(6).setCellValue(r.getBookingDateFrom().toString());
+                row.createCell(7).setCellValue(r.getBookingDateTo() != null ? r.getBookingDateTo().toString() : "");
+            }
 
-        for (int i = 0; i < columns.length; i++) {
-            header.createCell(i).setCellValue(columns[i]);
+            ByteArrayOutputStream bos = new ByteArrayOutputStream();
+            workbook.write(bos);
+            return new ByteArrayInputStream(bos.toByteArray());
+
+        } catch (IOException e) {
+            throw new FileProcessingException("Failed to export rates to Excel", e);
         }
-
-        int rowIdx = 1;
-        for (BungalowRate r : BungalowRate) {
-            Row row = sheet.createRow(rowIdx++);
-            row.createCell(0).setCellValue(r.getRateId());
-            row.createCell(1).setCellValue(r.getBungalowId());
-            row.createCell(2).setCellValue(r.getStayDateFrom().toString());
-            row.createCell(3).setCellValue(r.getStayDateTo().toString());
-            row.createCell(4).setCellValue(r.getNights());
-            row.createCell(5).setCellValue(r.getValue());
-            row.createCell(6).setCellValue(r.getBookingDateFrom().toString());
-            row.createCell(7).setCellValue(r.getBookingDateTo() != null ? r.getBookingDateTo().toString() : "");
-        }
-
-        ByteArrayOutputStream bos = new ByteArrayOutputStream();
-        workbook.write(bos);
-        workbook.close();
-        return new ByteArrayInputStream(bos.toByteArray());
     }
+
 
     /**
      * Imports rate data from an uploaded Excel file.
@@ -315,21 +342,20 @@ public class RateService{
      * @param file Excel upload that contains rate records
      * @throws IOException if the uploaded file cannot be read
      */
-    public void importRatesFromExcel(MultipartFile file) throws IOException {
+    public void importRatesFromExcel(MultipartFile file) {
         try (Workbook workbook = WorkbookFactory.create(file.getInputStream())) {
             Sheet sheet = workbook.getSheetAt(0);
-
             for (int i = 1; i <= sheet.getLastRowNum(); i++) {
                 Row row = sheet.getRow(i);
                 if (row == null) continue;
-
                 BungalowRate rate = util.parseRowToBungalowRate(row);
-
-                // Use createRate to handle splitting and merging
                 createRate(rate);
             }
+        } catch (IOException e) {
+            throw new FileProcessingException("Failed to import rates from Excel", e);
         }
     }
+
 
     /**
      * Calculates the total price for a stay at a given bungalow by evaluating the nightly rate
@@ -361,24 +387,24 @@ public class RateService{
      * @throws RuntimeException if no valid rate is found for any night in the stay period
      */
     public double calculatePrice(Long bungalowId, LocalDate arrival, LocalDate departure, LocalDate bookingDate) {
-
+        if (arrival == null || departure == null) {
+            throw new InvalidRequestException("Arrival and departure dates are required");
+        }
         if (!arrival.isBefore(departure)) {
-            throw new IllegalArgumentException("Arrival date must be before departure date");
+            throw new InvalidRequestException("Arrival date must be before departure date");
         }
 
-        // Fetch all rates for the bungalow
         List<BungalowRate> allRates = ratesRepository.findByBungalowIdOrderByStayDateFrom(bungalowId);
+        if (allRates.isEmpty()) {
+            throw new ResourceNotFoundException("No rates found for bungalow ID: " + bungalowId);
+        }
 
-        // Separate closed and active rates without Stream API
         List<BungalowRate> closedRates = new ArrayList<>();
         List<BungalowRate> activeRates = new ArrayList<>();
 
         for (BungalowRate r : allRates) {
-            if (r.getBookingDateTo() != null) {
-                closedRates.add(r);
-            } else {
-                activeRates.add(r);
-            }
+            if (r.getBookingDateTo() != null) closedRates.add(r);
+            else activeRates.add(r);
         }
 
         LocalDate current = arrival;
@@ -386,19 +412,15 @@ public class RateService{
 
         while (!current.isEqual(departure)) {
             BungalowRate matchedRate = util.findApplicableRate(current, bookingDate, activeRates, closedRates);
-
             if (matchedRate == null) {
-                throw new RuntimeException("No rate found for date: " + current);
+                throw new ResourceNotFoundException("No rate found for date: " + current);
             }
-
             double perNight = matchedRate.getValue() / matchedRate.getNights();
             totalPrice += perNight;
-
             current = current.plusDays(1);
         }
 
         return totalPrice;
     }
-
 
 }
